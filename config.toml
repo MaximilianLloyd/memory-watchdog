@@ -1,0 +1,63 @@
+# memory-watchdog configuration
+#
+# Installed to ~/.config/memory-watchdog/config.toml. The watchdog re-reads this
+# file when it changes, so edits apply without a restart. Run
+# `memory-watchdog check` to validate it and see what would be killed right now.
+
+# Seconds between pressure checks.
+interval_secs = 3
+
+# Seconds to wait after a kill before considering another one.
+settle_secs = 5
+
+# Seconds between SIGTERM and SIGKILL.
+grace_secs = 3
+
+# At "warn" pressure, act anyway if this percentage of memory or less is available.
+# "critical" pressure always acts.
+warn_free_percent = 10
+
+# Show a macOS notification for every kill.
+notify = true
+
+# Rules decide which processes may be killed. When memory pressure turns critical,
+# the watchdog kills the single largest process (by physical footprint) that you
+# own and that matches any rule at or above that rule's min_mb.
+#
+#   processes  executable names. A name matches when it appears as a whole word in
+#              the command line, or as the last part of a path ("node" matches
+#              "/usr/local/bin/node server.js", not "nodemon").
+#   patterns   regular expressions matched against the full command line.
+#   label      optional. Notifications and logs show "<label>: <matched text>"
+#              instead of the full command line.
+
+[[rule]]
+name = "dev tools"
+min_mb = 1500
+processes = [
+  "node",
+  "tsc",
+  "tsgo",
+  "tsgolint",
+  "tsserver",
+  "next-server",
+  "esbuild",
+  "turbo",
+  "vite",
+  "vitest",
+  "jest",
+  "webpack",
+  "eslint",
+]
+patterns = [
+  "next-server",
+  "/node_modules/",
+]
+
+[[rule]]
+name = "chrome tabs"
+# Lower threshold: Chrome's memory is spread over many tabs rather than one big process.
+min_mb = 500
+# Renderer processes only, so the browser itself stays open.
+patterns = ['Google Chrome[^/]*Helper \([^)]*Renderer\)']
+label = "Chrome tab"

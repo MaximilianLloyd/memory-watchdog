@@ -1,13 +1,15 @@
 [package]
 name = "memory-watchdog"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "Kill runaway dev-tool processes and Chrome tabs when macOS memory pressure turns critical"
+description = "Kill runaway processes when macOS memory pressure turns critical"
 publish = false
 
 [dependencies]
 libc = "0.2"
 regex = { version = "1", default-features = false, features = ["std", "perf", "unicode-perl"] }
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.2.1"
 
 [profile.release]
 opt-level = 3
