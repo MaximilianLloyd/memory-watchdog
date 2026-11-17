@@ -1,21 +1,23 @@
 # memory-watchdog
 
-A macOS launchd agent that watches memory pressure. When pressure turns critical, it kills the largest runaway process before the system runs out of swap and starts killing system helpers, which is what freezes apps.
+A small Rust daemon, run as a macOS launchd agent, that watches memory pressure. When pressure turns critical, it kills the largest runaway process before the system runs out of swap and starts killing system helpers, which is what freezes apps.
 
 Candidates for killing:
 
 - Dev tools (tsgo, tsc, tsserver, node, next-server, esbuild, vite, vitest, jest, webpack, eslint, and anything under `node_modules/`) using more than 1500 MB.
 - Chrome tab renderer processes using more than 500 MB. The browser itself is never killed.
 
-Only processes owned by the current user are considered. Each kill sends `SIGTERM`, then `SIGKILL` after 3 seconds, and shows a notification.
+Only processes owned by the current user are considered. Memory is the physical footprint (the number top and Activity Monitor show, including compressed memory), read directly with `proc_pid_rusage`; pressure comes from the `kern.memorystatus_vm_pressure_level` sysctl. Pressure counts as critical at level 4, or at level 2 (warn) with 10% or less memory available. Each kill sends `SIGTERM`, then `SIGKILL` after 3 seconds, and shows a notification.
 
 ## Install
+
+Requires a Rust toolchain.
 
 ```sh
 ./install.sh
 ```
 
-This copies the script to `~/.local/bin/memory-watchdog`, writes `~/Library/LaunchAgents/local.memory-watchdog.plist` and starts the agent. It starts at login and restarts if it stops.
+This builds the release binary, copies it to `~/.local/bin/memory-watchdog`, writes `~/Library/LaunchAgents/local.memory-watchdog.plist` and starts the agent. It starts at login and restarts if it stops.
 
 Remove it with `./uninstall.sh`. Stop it temporarily with `launchctl bootout gui/$(id -u)/local.memory-watchdog`.
 
@@ -38,5 +40,11 @@ Environment variables, mainly for testing:
 Test without killing anything:
 
 ```sh
-WATCHDOG_FORCE=1 WATCHDOG_DRY_RUN=1 WATCHDOG_ONCE=1 ./memory-watchdog && tail -1 ~/Library/Logs/memory-watchdog.log
+WATCHDOG_FORCE=1 WATCHDOG_DRY_RUN=1 WATCHDOG_ONCE=1 cargo run --release && tail -1 ~/Library/Logs/memory-watchdog.log
+```
+
+## Development
+
+```sh
+cargo test
 ```

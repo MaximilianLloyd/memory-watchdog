@@ -7,7 +7,8 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DOMAIN="gui/$(id -u)"
 
 mkdir -p "$HOME/.local/bin" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
-install -m 755 memory-watchdog "$HOME/.local/bin/memory-watchdog"
+cargo build --release
+install -m 755 target/release/memory-watchdog "$HOME/.local/bin/memory-watchdog"
 sed "s#__HOME__#$HOME#g" "$LABEL.plist" > "$PLIST"
 
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
