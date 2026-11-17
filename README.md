@@ -15,7 +15,7 @@ When a macOS machine runs out of memory, it doesn't fail cleanly. Swap fills up,
 memory-watchdog is a small background daemon that does that for you. It watches macOS memory pressure, and when pressure turns critical it kills the single largest process that you have marked as killable. It then shows a notification telling you what it killed and how much memory that freed.
 
 ```
-2026-11-17 19:24:45 critical pressure: killing pid=6411 11011MB [dev tools]: .../@effect/tsgo-darwin-arm64/artifact
+2026-11-17 19:24:45 critical pressure: killing pid=6411 11011MB [dev tools]: .../node_modules/@typescript/native-preview/tsgo --lsp
 ```
 
 ## Features
@@ -30,11 +30,14 @@ memory-watchdog is a small background daemon that does that for you. It watches 
 
 ## Requirements
 
-- macOS 13 or later (developed on Apple Silicon).
+- macOS 13 or later. Tested on macOS 27 on Apple Silicon.
 - A [Rust toolchain](https://rustup.rs) to build the daemon.
 - Xcode Command Line Tools (`xcode-select --install`) to build the notification app.
 
 ## Install
+
+> [!NOTE]
+> The config file is required. If it is missing or invalid at startup, the daemon logs the error and exits, and launchd keeps trying to restart it. The installer writes the default config and validates it, and `memory-watchdog check` shows any error.
 
 ```sh
 git clone https://github.com/MaximilianLloyd/memory-watchdog.git
@@ -56,7 +59,7 @@ To uninstall, run `./uninstall.sh`. This also leaves your config in place.
 
 ## Configuration
 
-Edit `~/.config/memory-watchdog/config.toml`. The [default config](config.toml) protects against JavaScript and TypeScript tooling and Chrome tabs:
+Edit `~/.config/memory-watchdog/config.toml`. The [default config](config.toml) protects against JavaScript and TypeScript tooling and Chrome tabs. Here it is abridged:
 
 ```toml
 [[rule]]
@@ -92,19 +95,20 @@ These global settings are optional:
 | `warn_free_percent` | `10` | At *warn* pressure, act if this percentage of memory or less is free. *Critical* pressure always acts. |
 | `notify` | `true` | Show a notification for each kill. |
 
-Example: to also cover a Python data job and Docker's VM, add these rules:
+Example: to also cover Python and virtual machines, add these rules. The VM rule covers every Virtualization.framework VM, including those run by Docker Desktop, OrbStack and UTM.
 
 ```toml
 [[rule]]
 name = "python"
 min_mb = 4000
-processes = ["python", "python3"]
+# python, python3, python3.12, ... as a command or the end of a path
+patterns = ['(^|/)python[0-9.]*( |$)']
 
 [[rule]]
-name = "docker vm"
+name = "virtual machines"
 min_mb = 8000
-patterns = ["com.apple.Virtualization.VirtualMachine"]
-label = "Docker VM"
+patterns = ['com\.apple\.Virtualization\.VirtualMachine']
+label = "VM"
 ```
 
 ### Check your config

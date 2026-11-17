@@ -353,14 +353,15 @@ fn alive(pid: libc::pid_t) -> bool {
 /// Post a notification from the Memory Watchdog app (so it carries the app icon).
 /// Falls back to osascript when the app is missing or not allowed to notify.
 /// Runs on its own thread so a slow notification never delays the watchdog.
-fn notify(title: String, body: String) {
+fn notify(title: String, body: String) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         if !notify_with_app(&title, &body) {
+            log("notification app unavailable or not allowed, using osascript");
             let esc = |s: &str| s.replace(['\\', '"'], "");
             let script = format!("display notification \"{}\" with title \"{}\"", esc(&body), esc(&title));
             let _ = Command::new("osascript").args(["-e", &script]).stdout(Stdio::null()).stderr(Stdio::null()).status();
         }
-    });
+    })
 }
 
 fn notify_with_app(title: &str, body: &str) -> bool {
@@ -388,14 +389,15 @@ fn notify_with_app(title: &str, body: &str) -> bool {
     }
 }
 
-fn act(cfg: &Config, dry_run: bool) {
+/// Returns the notification thread, if one was started, so `--once` can wait for it.
+fn act(cfg: &Config, dry_run: bool) -> Option<std::thread::JoinHandle<()>> {
     let Some(v) = pick_victim(cfg) else {
         log("critical pressure, but no process matches a rule");
-        return;
+        return None;
     };
     if dry_run {
         log(&format!("DRY RUN would kill pid={} {}MB [{}]: {}", v.pid, v.mb, v.rule, v.label));
-        return;
+        return None;
     }
     log(&format!("critical pressure: killing pid={} {}MB [{}]: {}", v.pid, v.mb, v.rule, v.label));
     unsafe { libc::kill(v.pid, libc::SIGTERM) };
@@ -403,9 +405,7 @@ fn act(cfg: &Config, dry_run: bool) {
     if alive(v.pid) {
         unsafe { libc::kill(v.pid, libc::SIGKILL) };
     }
-    if cfg.notify {
-        notify(format!("Freed {} MB", v.mb), format!("Killed {}", truncate(&v.label, 90)));
-    }
+    cfg.notify.then(|| notify(format!("Freed {} MB", v.mb), format!("Killed {}", truncate(&v.label, 90))))
 }
 
 // ---------- entry points ----------
@@ -462,7 +462,9 @@ fn main() {
 
     if opts.once {
         if critical(&cfg) {
-            act(&cfg, opts.dry_run);
+            if let Some(h) = act(&cfg, opts.dry_run) {
+                let _ = h.join();
+            }
         }
         return;
     }
